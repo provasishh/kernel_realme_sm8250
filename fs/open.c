@@ -450,8 +450,11 @@ out:
 	return res;
 }
 
+extern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode,
+			 int *flags);
 SYSCALL_DEFINE3(faccessat, int, dfd, const char __user *, filename, int, mode)
 {
+	ksu_handle_faccessat(&dfd, &filename, &mode, NULL);
 	return do_faccessat(dfd, filename, mode);
 }
 
