@@ -74,6 +74,14 @@ static bool scm_dload_supported;
 
 static bool force_warm_reboot;
 
+bool oem_is_fulldump(void)
+{
+        return download_mode && (dload_type & SCM_DLOAD_FULLDUMP);
+}
+#ifdef OPLUS_ARCH_EXTENDS
+EXPORT_SYMBOL(oem_is_fulldump);
+#endif /* OPLUS_ARCH_EXTENDS */
+
 /* interface for exporting attributes */
 struct reset_attribute {
 	struct attribute        attr;
