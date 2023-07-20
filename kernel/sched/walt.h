@@ -23,6 +23,10 @@
 /* Default window size (in ns) = 8ms */
 #define DEFAULT_SCHED_RAVG_WINDOW 8000000
 #endif
+#define WALT_CPUFREQ_CONTINUE		(1U << 1)
+#define WALT_CPUFREQ_IC_MIGRATION	(1U << 2)
+#define WALT_CPUFREQ_PL			(1U << 3)
+#define WALT_CPUFREQ_BOOST_UPDATE	(1U << 5)
 
 /* Max window size (in ns) = 1s */
 #define MAX_SCHED_RAVG_WINDOW 1000000000
@@ -45,6 +49,8 @@
 
 #define NEW_TASK_ACTIVE_TIME 100000000
 
+
+
 extern unsigned int sched_ravg_window;
 extern unsigned int new_sched_ravg_window;
 extern unsigned int max_possible_efficiency;
@@ -64,6 +70,11 @@ extern void update_task_ravg(struct task_struct *p, struct rq *rq, int event,
 						u64 wallclock, u64 irqtime);
 
 extern unsigned int walt_big_tasks(int cpu);
+
+struct waltgov_callback {
+	void (*func)(struct waltgov_callback *cb, u64 time, unsigned int flags);
+};
+
 
 static inline void
 inc_nr_big_task(struct walt_sched_stats *stats, struct task_struct *p)
@@ -104,14 +115,34 @@ fixup_cumulative_runnable_avg(struct walt_sched_stats *stats,
 			      s64 demand_scaled_delta,
 			      s64 pred_demand_scaled_delta)
 {
+	s64 cumulative_runnable_avg_scaled;
+	s64 pred_demands_sum_scaled;
+
 	if (sched_disable_window_stats)
 		return;
 
-	stats->cumulative_runnable_avg_scaled += demand_scaled_delta;
-	BUG_ON((s64)stats->cumulative_runnable_avg_scaled < 0);
+	cumulative_runnable_avg_scaled =
+		(s64)stats->cumulative_runnable_avg_scaled +
+		demand_scaled_delta;
+	pred_demands_sum_scaled =
+		(s64)stats->pred_demands_sum_scaled + pred_demand_scaled_delta;
 
-	stats->pred_demands_sum_scaled += pred_demand_scaled_delta;
-	BUG_ON((s64)stats->pred_demands_sum_scaled < 0);
+	if (cumulative_runnable_avg_scaled < 0) {
+		printk_deferred("WALT-BUG demand_scaled_delta=%lld cumulative_runnable_avg_scaled=%llu\n",
+				demand_scaled_delta,
+				stats->cumulative_runnable_avg_scaled);
+		cumulative_runnable_avg_scaled = 0;
+	}
+	stats->cumulative_runnable_avg_scaled =
+		(u64)cumulative_runnable_avg_scaled;
+
+	if (pred_demands_sum_scaled < 0) {
+		printk_deferred("WALT-BUG task pred_demand_scaled_delta=%lld pred_demands_sum_scaled=%llu\n",
+				pred_demand_scaled_delta,
+				stats->pred_demands_sum_scaled);
+		pred_demands_sum_scaled = 0;
+	}
+	stats->pred_demands_sum_scaled = (u64)pred_demands_sum_scaled;
 }
 
 static inline void
@@ -185,6 +216,10 @@ static inline u64 sched_irqload(int cpu)
 	else
 		return 0;
 }
+
+
+
+
 
 static inline int sched_cpu_high_irqload(int cpu)
 {
