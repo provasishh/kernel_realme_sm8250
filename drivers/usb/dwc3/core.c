@@ -1665,6 +1665,7 @@ skip_clk_reset:
 
 	pm_runtime_allow(dev);
 	dwc3_debugfs_init(dwc);
+
 	return 0;
 
 err3:
